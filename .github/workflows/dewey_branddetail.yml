@@ -1,0 +1,46 @@
+name: Dewey → Blob (brand_detail full load)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dewey client
+        run: |
+          python -m pip install --upgrade pip
+          pip install deweypy
+
+      - name: Install AzCopy
+        run: |
+          curl -L https://aka.ms/downloadazcopy-v10-linux -o azcopy.tar.gz
+          tar -xzf azcopy.tar.gz
+          sudo cp ./azcopy_linux_amd64_*/azcopy /usr/local/bin/
+
+      - name: Dewey download (brand_detail)
+        env:
+          DEWEY_API_KEY: ${{ secrets.DEWEY_API_KEY }}
+          FOLDER_ID: ${{ secrets.DEWEY_BRANDDETAIL_FOLDER_ID }}
+        run: |
+          mkdir -p ./dewey-downloads
+          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" --download-directory ./dewey-downloads
+
+      - name: Upload to Blob (raw-dewey /brand_detail)
+        env:
+          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+        run: |
+          azcopy copy "./dewey-downloads/*" "$BLOB_SAS_URL/brand_detail" --recursive=true
+
+      - name: Summary
+        run: |
+          echo "Uploaded brand_detail files to raw-dewey/brand_detail"
