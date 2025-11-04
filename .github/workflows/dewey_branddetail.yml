@@ -33,7 +33,8 @@ jobs:
           FOLDER_ID: ${{ secrets.DEWEY_BRANDDETAIL_FOLDER_ID }}
         run: |
           mkdir -p ./dewey-downloads
-          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" --download-directory ./dewey-downloads
+          # default download location is ./dewey-downloads when it exists
+          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID"
 
       - name: Upload to Blob (raw-dewey /brand_detail)
         env:
