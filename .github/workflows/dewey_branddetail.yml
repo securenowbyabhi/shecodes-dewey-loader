@@ -6,6 +6,7 @@ on:
 jobs:
   load:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
       - name: Checkout
@@ -23,25 +24,34 @@ jobs:
 
       - name: Install AzCopy
         run: |
-          curl -L https://aka.ms/downloadazcopy-v10-linux -o azcopy.tar.gz
-          tar -xzf azcopy.tar.gz
+          AZCOPY_URL="https://aka.ms/downloadazcopy-v10-linux"
+          curl -L "$AZCOPY_URL" -o azcopy.tar.gz
+          tar -xf azcopy.tar.gz
           sudo cp ./azcopy_linux_amd64_*/azcopy /usr/local/bin/
+          azcopy --version
 
       - name: Dewey download (brand_detail)
         env:
           DEWEY_API_KEY: ${{ secrets.DEWEY_API_KEY }}
-          FOLDER_ID: ${{ secrets.DEWEY_BRANDDETAIL_FOLDER_ID }}
+          FOLDER_ID: ${{ secrets.DEWEY_BRANDDETAIL_FOLDER_ID }}   # <- set this secret
         run: |
-          mkdir -p ./dewey-downloads
-          # default download location is ./dewey-downloads when it exists
-          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID"
+          mkdir -p "$GITHUB_WORKSPACE/dewey-downloads"
+          export DEWEY_DOWNLOAD_DIRECTORY="$GITHUB_WORKSPACE/dewey-downloads"
+          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" --num-workers 8
+          ls -lah "$GITHUB_WORKSPACE/dewey-downloads" | head -50
 
-      - name: Upload to Blob (raw-dewey /brand_detail)
+      - name: Upload to Blob (raw-dewey /brand_detail) via SAS
         env:
-          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}  # container SAS: https://shecodessa.blob.core.windows.net/raw-dewey?<sas>
         run: |
-          azcopy copy "./dewey-downloads/*" "$BLOB_SAS_URL/brand_detail" --recursive=true
+          # Split container SAS into base + query to append path safely
+          DEST_BASE="${BLOB_SAS_URL%%\?*}"   # before '?'
+          DEST_SAS="${BLOB_SAS_URL#*\?}"     # after '?'
+          DEST_URL="${DEST_BASE}/brand_detail?${DEST_SAS}"
+
+          echo "Destination container: ${DEST_BASE} (masking SAS)"
+          azcopy copy "$GITHUB_WORKSPACE/dewey-downloads/*" "$DEST_URL" --recursive=true --overwrite=true
+          echo "Upload complete to brand_detail."
 
       - name: Summary
-        run: |
-          echo "Uploaded brand_detail files to raw-dewey/brand_detail"
+        run: echo "✅ Dewey brand_detail uploaded to raw-dewey/brand_detail."
