@@ -34,18 +34,19 @@ jobs:
         env:
           DEWEY_API_KEY: ${{ secrets.DEWEY_API_KEY }}
           FOLDER_ID: ${{ secrets.FOLDER_ID }}
+          DEWEY_DOWNLOAD_DIRECTORY: ./dewey-downloads
         run: |
-          mkdir -p downloads
+          mkdir -p ./dewey-downloads
           python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" \
             --num-workers 8 \
-            --output-path ./downloads
-          ls -lah ./downloads | head -50
+            --download-directory ./dewey-downloads
+          ls -lah ./dewey-downloads | head -50
 
       - name: Upload to Blob (raw-dewey)
         env:
           BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
         run: |
-          azcopy copy "./downloads/*" "$BLOB_SAS_URL" --recursive=true
+          azcopy copy "./dewey-downloads/*" "$BLOB_SAS_URL/daily_spend" --recursive=true
 
       - name: Summary
-        run: echo "Dewey files uploaded to Blob container."
+        run: echo "✅ Dewey data successfully uploaded to Azure Blob container."
