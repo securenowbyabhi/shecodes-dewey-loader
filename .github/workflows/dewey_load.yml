@@ -34,19 +34,18 @@ jobs:
         env:
           DEWEY_API_KEY: ${{ secrets.DEWEY_API_KEY }}
           FOLDER_ID: ${{ secrets.FOLDER_ID }}
-          DEWEY_DOWNLOAD_DIRECTORY: ./dewey-downloads
         run: |
-          mkdir -p ./dewey-downloads
+          mkdir -p "$GITHUB_WORKSPACE/dewey-downloads"
+          export DEWEY_DOWNLOAD_DIRECTORY="$GITHUB_WORKSPACE/dewey-downloads"
           python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" \
-            --num-workers 8 \
-            --download-directory ./dewey-downloads
-          ls -lah ./dewey-downloads | head -50
+            --num-workers 8
+          ls -lah "$GITHUB_WORKSPACE/dewey-downloads" | head -50
 
       - name: Upload to Blob (raw-dewey)
         env:
           BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
         run: |
-          azcopy copy "./dewey-downloads/*" "$BLOB_SAS_URL/daily_spend" --recursive=true
+          azcopy copy "$GITHUB_WORKSPACE/dewey-downloads/*" "$BLOB_SAS_URL/daily_spend" --recursive=true
 
       - name: Summary
         run: echo "✅ Dewey data successfully uploaded to Azure Blob container."
