@@ -37,15 +37,20 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/dewey-downloads"
           export DEWEY_DOWNLOAD_DIRECTORY="$GITHUB_WORKSPACE/dewey-downloads"
-          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" \
-            --num-workers 8
+          python -m deweypy --api-key "$DEWEY_API_KEY" speedy-download "$FOLDER_ID" --num-workers 8
           ls -lah "$GITHUB_WORKSPACE/dewey-downloads" | head -50
 
-      - name: Upload to Blob (raw-dewey)
+      - name: Upload to Blob (raw-dewey /daily_spend)
         env:
           BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
         run: |
-          azcopy copy "$GITHUB_WORKSPACE/dewey-downloads/*" "$BLOB_SAS_URL/daily_spend" --recursive=true
+          # BLOB_SAS_URL must be the *container* SAS, like:
+          # https://shecodessa.blob.core.windows.net/raw-dewey?<sas>
+          DEST_BASE="${BLOB_SAS_URL%%\?*}"   # before '?'
+          DEST_SAS="${BLOB_SAS_URL#*\?}"     # after '?'
+          DEST_URL="${DEST_BASE}/daily_spend?${DEST_SAS}"
+          echo "Destination: $DEST_URL"
+          azcopy copy "$GITHUB_WORKSPACE/dewey-downloads/*" "$DEST_URL" --recursive=true
 
       - name: Summary
-        run: echo "✅ Dewey data successfully uploaded to Azure Blob container."
+        run: echo "✅ Dewey data uploaded to raw-dewey/daily_spend."
